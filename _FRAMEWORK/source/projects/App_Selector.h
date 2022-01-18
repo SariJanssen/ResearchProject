@@ -13,4 +13,5 @@
 //#define ActiveApp_AgarioGame_BT
 //#define ActiveApp_InfluenceMap
 //#define ActiveApp_AgarioGame_IM
-#define ActiveApp_MachineLearning
+//#define ActiveApp_MachineLearning
+#define ActiveApp_JumpPointSearchPathfinding

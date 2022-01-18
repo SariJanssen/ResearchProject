@@ -145,6 +145,9 @@
     <Filter Include="projects\MachineLearning">
       <UniqueIdentifier>{18fefcff-2afc-4b50-99a3-4f57286a0480}</UniqueIdentifier>
     </Filter>
+    <Filter Include="projects\Movement\Pathfinding\PathfindingJPS">
+      <UniqueIdentifier>{790d10fa-9569-4818-8a1b-3420c863ea0c}</UniqueIdentifier>
+    </Filter>
   </ItemGroup>
   <ItemGroup>
     <ClCompile Include="framework\EliteGeometry\EGeometry2DTypes.cpp">
@@ -303,6 +306,9 @@
     </ClCompile>
     <ClCompile Include="projects\MachineLearning\QLearning.cpp">
       <Filter>projects\MachineLearning</Filter>
+    </ClCompile>
+    <ClCompile Include="projects\Movement\Pathfinding\PathfindingJPS\App_PathfindingJPS.cpp">
+      <Filter>projects\Movement\Pathfinding\PathfindingJPS</Filter>
     </ClCompile>
   </ItemGroup>
   <ItemGroup>
@@ -600,6 +606,12 @@
     </ClInclude>
     <ClInclude Include="projects\MachineLearning\QLearning.h">
       <Filter>projects\MachineLearning</Filter>
+    </ClInclude>
+    <ClInclude Include="projects\Movement\Pathfinding\PathfindingJPS\App_PathfindingJPS.h">
+      <Filter>projects\Movement\Pathfinding\PathfindingJPS</Filter>
+    </ClInclude>
+    <ClInclude Include="EJPS.h">
+      <Filter>framework\EliteAI\EliteGraphAlgorithms</Filter>
     </ClInclude>
   </ItemGroup>
   <ItemGroup>

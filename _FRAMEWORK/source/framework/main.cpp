@@ -33,6 +33,8 @@
 	#include"projects\DecisionMaking\InfluenceMaps\App_AgarioGame_IM.h"
 #elif defined(ActiveApp_MachineLearning)
 	#include "projects\MachineLearning\App_MachineLearning.h"
+#elif defined(ActiveApp_JumpPointSearchPathfinding)
+	#include "projects\Movement\Pathfinding\PathfindingJPS\App_PathfindingJPS.h"
 #endif
 
 //Hotfix for genetic algorithms project
@@ -110,6 +112,8 @@ int main(int argc, char* argv[])
 		myApp = new App_AgarioGame_IM();
 #elif defined(ActiveApp_MachineLearning)
 		myApp = new App_MachineLearning();
+#elif defined(ActiveApp_JumpPointSearchPathfinding)
+		myApp = new App_PathfindingJPS();
 #endif
 		ELITE_ASSERT(myApp, "Application has not been created.");
 		//Boot application
