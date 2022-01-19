@@ -64,14 +64,32 @@ namespace Elite
 
 			// return successorvec
 		
-		// noderecord jump(current, Vec2{x,y}, start, end)
+		// noderecord JUMP(current, Vec2{x,y}, start, end)
 			// next = current + vec2
 			// if(next is terrain) return null
 			// if(next == end) return next
 
 			// diagonal case
 			// if(x != 0 && y != 0)
-				// 
+				// if(current.x + x == obstacle || current.y + y == obstacle) return next
+				// if (jump(next.x, next.y, x, 0, start, end) == null) return next
+				// if (jump(next.x, next.y, 0, y, start, end) == null) return next
+			
+			// horizontal case
+			// else if( x != 0)
+				// if (current.y + 1 == obstacle) && if (current.x + x, current.y + 1 != obstacle)
+					// return next
+				// else if (current.y - 1 == obstacle) && if (current.x + x, current.y - 1 != obstacle)
+					// return next
+
+			// vertical case
+			// else
+				// if (current.x + 1 == obstacle) && if (current.x + 1, current.y + y != obstacle)
+					// return next
+				// else if (current.x - 1 == obstacle) && if (current.x - 1, current.y + y != obstacle)
+					// return next
+
+			// return jump(next.x, next.y. x, y. start, end)
 			
 		
 		
