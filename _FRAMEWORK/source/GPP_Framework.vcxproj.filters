@@ -610,7 +610,7 @@
     <ClInclude Include="projects\Movement\Pathfinding\PathfindingJPS\App_PathfindingJPS.h">
       <Filter>projects\Movement\Pathfinding\PathfindingJPS</Filter>
     </ClInclude>
-    <ClInclude Include="EJPS.h">
+    <ClInclude Include="framework\EliteAI\EliteGraphs\EliteGraphAlgorithms\EJPS.h">
       <Filter>framework\EliteAI\EliteGraphAlgorithms</Filter>
     </ClInclude>
   </ItemGroup>

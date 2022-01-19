@@ -145,7 +145,7 @@ void App_PathfindingJPS::UpdateImGui()
 
 		/*Spacing*/ImGui::Spacing(); ImGui::Separator(); ImGui::Spacing(); ImGui::Spacing();
 
-		ImGui::Text("A* Pathfinding");
+		ImGui::Text("Jump Path Search Pathfinding");
 		ImGui::Spacing();
 
 		ImGui::Text("Middle Mouse");

@@ -49,6 +49,32 @@ namespace Elite
 	template <class T_NodeType, class T_ConnectionType>
 	std::vector<T_NodeType*> JPS<T_NodeType, T_ConnectionType>::FindPath(T_NodeType* pStartNode, T_NodeType* pGoalNode)
 	{
+		// pick from open list, the node with lowest f-score
+		// identify successors (instead of picking adjacent nodes)
+			// ->eliminates nodes that are not interesting to our path
+		
+			// vector IDENTIFY SUCCESSORS(current, start, end) 
+			// get neighbors of current
+			// for each neighbor
+				// int x = clamp(neighbor.x - current.x, -1, 1)
+				// int y = clamp(neighbor.y - current.y, -1, 1)
+
+				// jumpPoint = noderecord jump(current.x, current.y, x, y, start, end)
+				// if (jumpPoint) successorvec.pusback(jumpoint)
+
+			// return successorvec
+		
+		// noderecord jump(current, Vec2{x,y}, start, end)
+			// next = current + vec2
+			// if(next is terrain) return null
+			// if(next == end) return next
+
+			// diagonal case
+			// if(x != 0 && y != 0)
+				// 
+			
+		
+		
 		std::vector<T_NodeType*> path{};
 		std::vector<NodeRecord> openList{};
 		std::vector<NodeRecord> closedList{};
