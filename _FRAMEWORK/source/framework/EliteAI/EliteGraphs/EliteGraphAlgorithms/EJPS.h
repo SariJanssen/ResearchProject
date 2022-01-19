@@ -7,7 +7,7 @@ namespace Elite
 	class JPS
 	{
 	public:
-		JPS(IGraph<T_NodeType, T_ConnectionType>* pGraph, Heuristic hFunction);
+		JPS(GridGraph<T_NodeType, T_ConnectionType>* pGraph, Heuristic hFunction);
 
 		struct NodeRecord
 		{
@@ -37,12 +37,12 @@ namespace Elite
 		std::vector<NodeRecord> IdentifySuccessors(const NodeRecord& pCurrentNode, T_NodeType* pStartNode, T_NodeType* pGoalNode);
 		NodeRecord Jump(const NodeRecord& pCurrentNode, const Elite::Vector2& difference, T_NodeType* pStartNode, T_NodeType* pGoalNode);
 
-		IGraph<T_NodeType, T_ConnectionType>* m_pGraph;
+		GridGraph<T_NodeType, T_ConnectionType>* m_pGraph;
 		Heuristic m_HeuristicFunction;
 	};
 
 	template <class T_NodeType, class T_ConnectionType>
-	JPS<T_NodeType, T_ConnectionType>::JPS(IGraph<T_NodeType, T_ConnectionType>* pGraph, Heuristic hFunction)
+	JPS<T_NodeType, T_ConnectionType>::JPS(GridGraph<T_NodeType, T_ConnectionType>* pGraph, Heuristic hFunction)
 		: m_pGraph(pGraph)
 		, m_HeuristicFunction(hFunction)
 	{
@@ -65,8 +65,8 @@ namespace Elite
 			T_NodeType* pNeighborNode = m_pGraph->GetNode(nodeIdx);
 			Elite::Vector2 neighborNodePos = m_pGraph->GetNodeWorldPos(pNeighborNode);
 			Elite::Vector2 currentNodePos = m_pGraph->GetNodeWorldPos(pCurrentNode.pNode);
-			float x = clamp(neighborNodePos.x - currentNodePos.x, -1.f, 1.f);
-			float y = clamp(neighborNodePos.y - currentNodePos.y, -1.f, 1.f);
+			float x = neighborNodePos.x - currentNodePos.x;
+			float y = neighborNodePos.y - currentNodePos.y;
 
 			// jumpPoint = noderecord jump(current.x, current.y, x, y, start, end)
 			NodeRecord jumpPoint = Jump(pCurrentNode, Elite::Vector2{ x, y }, pStartNode, pGoalNode);
@@ -86,17 +86,20 @@ namespace Elite
 		Elite::Vector2 currentNodePos = m_pGraph->GetNodeWorldPos(pCurrentNode.pNode);
 		// next = current + vec2
 		T_NodeType* pNextNode = m_pGraph->GetNodeAtWorldPos({ currentNodePos.x + difference.x, currentNodePos.y + difference.y });
+		
+		if (pNextNode == nullptr)
+			return NodeRecord{};
 
+		// if(next is terrain) return null
+		if (pNextNode->GetTerrainType() == TerrainType::Water)
+			return NodeRecord{};
+		
 		NodeRecord nextJumpNR{};
 		nextJumpNR.pNode = pNextNode;
 		nextJumpNR.pConnection = m_pGraph->GetConnection(pCurrentNode.pNode->GetIndex(), pNextNode->GetIndex());
 		nextJumpNR.gCost = nextJumpNR.pConnection->GetCost() + pCurrentNode.gCost;
 		nextJumpNR.fCost = nextJumpNR.gCost + GetHeuristicCost(pCurrentNode.pNode, pGoalNode);
 
-		// if(next is terrain) return null
-		if (pNextNode->GetTerrainType() == TerrainType::Water)
-			return NodeRecord{};
-		
 		// if(next == end) return next
 		if (pNextNode == pGoalNode)
 			return nextJumpNR;
@@ -125,32 +128,66 @@ namespace Elite
 		// else if( x != 0)
 		else if (!Elite::AreEqual(difference.x, 0.f)) // Horizontal Case
 		{
-			// if (current.y + 1 == obstacle) && if (current.x + x, current.y + 1 != obstacle)
+			int idx{};
+			int nrCols = m_pGraph->GetColumns();
+			
+			idx = pCurrentNode.pNode->GetIndex() + nrCols;
+			if (m_pGraph->IsNodeValid(idx))
+			{
+				float nodeUp = m_pGraph->GetNodeWorldPos(idx).y;
+				// if (current.y + 1 == obstacle) && if (current.x + x, current.y + 1 != obstacle)
 				// return next
-			if (m_pGraph->GetNodeAtWorldPos({ currentNodePos.x, currentNodePos.y + 1.f })->GetTerrainType() == TerrainType::Water
-			 && m_pGraph->GetNodeAtWorldPos({ currentNodePos.x + difference.x, currentNodePos.y + 1.f })->GetTerrainType() != TerrainType::Water)
-				return nextJumpNR;
-			// else if (current.y - 1 == obstacle) && if (current.x + x, current.y - 1 != obstacle)
-				// return next
-			else if (m_pGraph->GetNodeAtWorldPos({ currentNodePos.x, currentNodePos.y - 1.f })->GetTerrainType() == TerrainType::Water
-				  && m_pGraph->GetNodeAtWorldPos({ currentNodePos.x + difference.x, currentNodePos.y + 1.f })->GetTerrainType() != TerrainType::Water)
-				return nextJumpNR;
+				if (m_pGraph->GetNodeAtWorldPos({ currentNodePos.x, nodeUp })->GetTerrainType() == TerrainType::Water
+				 && m_pGraph->GetNodeAtWorldPos({ currentNodePos.x + difference.x, nodeUp })->GetTerrainType() != TerrainType::Water)
+					return nextJumpNR;
+				//if (m_pGraph->GetNodeAtWorldPos({ currentNodePos.x, currentNodePos.y + 1.f })->GetTerrainType() == TerrainType::Water
+				//	&& m_pGraph->GetNodeAtWorldPos({ currentNodePos.x + difference.x, currentNodePos.y + 1.f })->GetTerrainType() != TerrainType::Water)
+				//	return nextJumpNR;
+			}
+
+			idx = pCurrentNode.pNode->GetIndex() - nrCols;
+			if (m_pGraph->IsNodeValid(idx))
+			{
+				float nodeDown = m_pGraph->GetNodeWorldPos(idx).y;
+				// else if (current.y - 1 == obstacle) && if (current.x + x, current.y - 1 != obstacle)
+					// return next
+				if (m_pGraph->GetNodeAtWorldPos({ currentNodePos.x, nodeDown })->GetTerrainType() == TerrainType::Water
+				 && m_pGraph->GetNodeAtWorldPos({ currentNodePos.x + difference.x, nodeDown })->GetTerrainType() != TerrainType::Water)
+					return nextJumpNR;
+			}
 		}
 
 		// vertical case
 		else  //Vertical Case
 		{
-			// if (current.x + 1 == obstacle) && if (current.x + 1, current.y + y != obstacle)
-				// return next
-			if (m_pGraph->GetNodeAtWorldPos({ currentNodePos.x + 1.f, currentNodePos.y })->GetTerrainType() == TerrainType::Water
-				&& m_pGraph->GetNodeAtWorldPos({ currentNodePos.x + 1.f, currentNodePos.y + difference.y })->GetTerrainType() != TerrainType::Water)
-				return nextJumpNR;
+			int idx{};
+			int nrRows = m_pGraph->GetRows();
 
-			// else if (current.x - 1 == obstacle) && if (current.x - 1, current.y + y != obstacle)
+			// need to check node left and node right if valid 
+			// but node + difference will be valid because they are checked in successors
+			idx = pCurrentNode.pNode->GetIndex() + 1;
+			if (m_pGraph->IsNodeValid(idx) && (int(idx / nrRows) == int(pCurrentNode.pNode->GetIndex() / nrRows)))
+			{
+				float nodeLeft = m_pGraph->GetNodeWorldPos(idx).x;
+
+				// if (current.x + 1 == obstacle) && if (current.x + 1, current.y + y != obstacle)
 				// return next
-			if (m_pGraph->GetNodeAtWorldPos({ currentNodePos.x - 1.f, currentNodePos.y })->GetTerrainType() == TerrainType::Water
-				&& m_pGraph->GetNodeAtWorldPos({ currentNodePos.x - 1.f, currentNodePos.y + difference.y })->GetTerrainType() != TerrainType::Water)
-				return nextJumpNR;
+				if (m_pGraph->GetNodeAtWorldPos({ nodeLeft, currentNodePos.y })->GetTerrainType() == TerrainType::Water
+				 && m_pGraph->GetNodeAtWorldPos({ nodeLeft, currentNodePos.y + difference.y })->GetTerrainType() != TerrainType::Water)
+					return nextJumpNR;
+			}
+
+			idx = pCurrentNode.pNode->GetIndex() - 1;
+			if (m_pGraph->IsNodeValid(idx) && (int(idx / nrRows) == int(pCurrentNode.pNode->GetIndex() / nrRows)))
+			{
+				float nodeRight = m_pGraph->GetNodeWorldPos(idx).x;
+
+				// else if (current.x - 1 == obstacle) && if (current.x - 1, current.y + y != obstacle)
+					// return next
+				if (m_pGraph->GetNodeAtWorldPos({ nodeRight, currentNodePos.y })->GetTerrainType() == TerrainType::Water
+				 && m_pGraph->GetNodeAtWorldPos({ nodeRight, currentNodePos.y + difference.y })->GetTerrainType() != TerrainType::Water)
+					return nextJumpNR;
+			}
 		}
 		
 		// return jump(next.x, next.y. x, y. start, end)
@@ -248,9 +285,6 @@ namespace Elite
 		return path;
 	}
 	
-	template <class T_NodeType, class T_ConnectionType>
-	void PreviousPath(T_NodeType* pStartNode, T_NodeType* pGoalNode)
-	{
 		// pick from open list, the node with lowest f-score
 			// if (next = destination)
 				//current = next
@@ -309,126 +343,6 @@ namespace Elite
 				// -> if new successor g cost + 1 smaller -> previos-> parent == successor-> parent
 				// calculate fcost
 			
-
-		std::vector<T_NodeType*> path{};
-		std::vector<NodeRecord> openList{};
-		std::vector<NodeRecord> closedList{};
-
-		// 1. Create startRecord and add to open List to start while loop
-		NodeRecord currentRecord{};
-		currentRecord.pNode = pStartNode;
-		currentRecord.pConnection = nullptr;
-		currentRecord.fCost = GetHeuristicCost(pStartNode, pGoalNode);
-
-		openList.push_back(currentRecord);
-
-		// 2. Continue searching for a connection that leads to the end node
-		while (!openList.empty())
-		{
-			// 2.a Get the connection with lowest F score
-			currentRecord = openList[0];
-			for (const NodeRecord& recordFromList : openList)
-			{
-				if (recordFromList.fCost < currentRecord.fCost)
-				{
-					currentRecord = recordFromList;
-				}
-			}
-
-			// 2.b Check if that connection leads to the end node
-			if (currentRecord.pNode == pGoalNode)
-			{
-				break;
-			}
-
-			// 2.c Get all the connections of the NodeRecord's node
-			auto connectionList = m_pGraph->GetNodeConnections(currentRecord.pNode->GetIndex());
-			for (const auto& pConnection : connectionList)
-			{
-				// Calculate the total cost so far
-				float gCost = pConnection->GetCost() + currentRecord.gCost;
-
-				// 2.d Check if any of them lead to a node already on the closed list
-				int getToIdx = pConnection->GetTo();
-				auto pGetToNode = m_pGraph->GetNode(getToIdx);
-
-				bool isInClosed{ false };
-				for (size_t i{}; i < closedList.size(); ++i)
-				{
-					if (closedList[i].pNode == pGetToNode)
-					{
-						isInClosed = true;
-						if (closedList[i].gCost > gCost)
-						{
-							const vector<NodeRecord>::iterator& it = closedList.begin() + i;
-							closedList.erase(it);
-							break;
-						}
-					}
-				}
-
-				if (isInClosed == true)
-				{
-					continue;
-				}
-
-				// 2.e If 2.d check failed, check if any of those connections lead to a node already on the open list
-				bool isInOpen{ false };
-				for (size_t i{}; i < openList.size(); ++i)
-				{
-					if (openList[i].pNode == pGetToNode)
-					{
-						isInOpen = true;
-						if (openList[i].gCost > gCost)
-						{
-							vector<NodeRecord>::iterator it = openList.begin() + i;
-							openList.erase(it);
-						}
-						break;
-					}
-				}
-
-				if (isInOpen == true)
-				{
-					continue;
-				}
-
-				// 2.f At this point any expensive connection should be removed. We create a new nodeRecord and add it to the openList
-				NodeRecord newRecord{};
-				newRecord.pNode = pGetToNode;
-				newRecord.pConnection = pConnection;
-				newRecord.gCost = gCost;
-				newRecord.fCost = gCost + GetHeuristicCost(pGetToNode, pGoalNode);
-				openList.push_back(newRecord);
-			}
-
-			// 2.g Remove NodeRecord from the openList and add it to the closedList
-			auto it = std::find(openList.begin(), openList.end(), currentRecord);
-			assert(it != openList.end());
-			openList.erase(it);
-			closedList.push_back(currentRecord);
-		}
-
-		// 3. Reconstruct path from last connection to start node
-		path.push_back(pGoalNode);
-
-		while (currentRecord.pNode != pStartNode)
-		{
-			for (size_t i{}; i < closedList.size(); ++i)
-			{
-				int prevNodeIdx = currentRecord.pConnection->GetFrom();
-				if (closedList[i].pNode == m_pGraph->GetNode(prevNodeIdx))
-				{
-					path.push_back(closedList[i].pNode);
-					currentRecord = closedList[i];
-					break;
-				}
-			}
-		}
-
-		std::reverse(path.begin(), path.end());
-		return path;
-	}
 
 	template <class T_NodeType, class T_ConnectionType>
 	float Elite::JPS<T_NodeType, T_ConnectionType>::GetHeuristicCost(T_NodeType* pStartNode, T_NodeType* pEndNode) const
