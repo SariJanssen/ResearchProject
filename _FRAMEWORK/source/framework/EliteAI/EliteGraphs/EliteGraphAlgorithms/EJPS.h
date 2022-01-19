@@ -50,6 +50,14 @@ namespace Elite
 	std::vector<T_NodeType*> JPS<T_NodeType, T_ConnectionType>::FindPath(T_NodeType* pStartNode, T_NodeType* pGoalNode)
 	{
 		// pick from open list, the node with lowest f-score
+			// if (next = destination)
+				//current = next
+				// while (current)
+					// path.pushback(current)
+					// current = current.connection.start
+				// reverse path
+				//end
+
 		// identify successors (instead of picking adjacent nodes)
 			// ->eliminates nodes that are not interesting to our path
 		
@@ -90,6 +98,14 @@ namespace Elite
 					// return next
 
 			// return jump(next.x, next.y. x, y. start, end)
+
+		// successors obtained
+			// check if successor in closed list -> continue;
+			// check if successor in open list -> 
+				// if not in open list -> calculate f cost and add
+				// if in open list -> compare g-cost 
+				// -> if new successor g cost + 1 smaller -> previos-> parent == successor-> parent
+				// calculate fcost
 			
 		
 		
