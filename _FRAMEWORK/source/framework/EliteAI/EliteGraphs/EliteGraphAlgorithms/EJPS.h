@@ -34,7 +34,8 @@ namespace Elite
 
 	private:
 		float GetHeuristicCost(T_NodeType* pStartNode, T_NodeType* pEndNode) const;
-		std::vector<NodeRecord> IdentifySuccessors(T_NodeType* pCurrentNode, T_NodeType* pStartNode, T_NodeType* pGoalNode);
+		std::vector<NodeRecord> IdentifySuccessors(const NodeRecord& pCurrentNode, T_NodeType* pStartNode, T_NodeType* pGoalNode);
+		NodeRecord Jump(const NodeRecord& pCurrentNode, const Elite::Vector2& difference, T_NodeType* pStartNode, T_NodeType* pGoalNode);
 
 		IGraph<T_NodeType, T_ConnectionType>* m_pGraph;
 		Heuristic m_HeuristicFunction;
@@ -48,13 +49,13 @@ namespace Elite
 	}
 
 	template <class T_NodeType, class T_ConnectionType>
-	std::vector<JPS<T_NodeType, T_ConnectionType>::NodeRecord> JPS<T_NodeType, T_ConnectionType>::IdentifySuccessors(T_NodeType* pCurrentNode, T_NodeType* pStartNode, T_NodeType* pGoalNode)
+	std::vector<typename JPS<T_NodeType, T_ConnectionType>::NodeRecord> JPS<T_NodeType, T_ConnectionType>::IdentifySuccessors(const typename JPS<T_NodeType, T_ConnectionType>::NodeRecord& pCurrentNode, T_NodeType* pStartNode, T_NodeType* pGoalNode)
 	{
 		// vector IDENTIFY SUCCESSORS(current, start, end) 
 		std::vector<NodeRecord> successors{};
 
 		// get neighbors of current
-		auto& connectionList = m_pGraph->GetNodeConnections(pCurrentNode->GetIndex());
+		auto& connectionList = m_pGraph->GetNodeConnections(pCurrentNode.pNode->GetIndex());
 		// for each neighbor
 		for (const auto& pConnection : connectionList)
 		{
@@ -62,22 +63,98 @@ namespace Elite
 			// int y = clamp(neighbor.y - current.y, -1, 1)
 			int nodeIdx = pConnection->GetTo();
 			T_NodeType* pNeighborNode = m_pGraph->GetNode(nodeIdx);
-			Elite::Vector2 pNeighborNodePos = m_pGraph->GetNodeWorldPos(pNeighborNode);
-			Elite::Vector2 pCurrentNodePos = m_pGraph->GetNodeWorldPos(pCurrentNode);
-			int x = clamp(pNeighborNodePos.x - pCurrentNodePos.x, -1.f, 1.f);
-			int y = clamp(pNeighborNodePos.y - pCurrentNodePos.y, -1.f, 1.f);
+			Elite::Vector2 neighborNodePos = m_pGraph->GetNodeWorldPos(pNeighborNode);
+			Elite::Vector2 currentNodePos = m_pGraph->GetNodeWorldPos(pCurrentNode.pNode);
+			float x = clamp(neighborNodePos.x - currentNodePos.x, -1.f, 1.f);
+			float y = clamp(neighborNodePos.y - currentNodePos.y, -1.f, 1.f);
 
 			// jumpPoint = noderecord jump(current.x, current.y, x, y, start, end)
-			NodeRecord jumpPoint{}; //jump
+			NodeRecord jumpPoint = Jump(pCurrentNode, Elite::Vector2{ x, y }, pStartNode, pGoalNode);
 
 			// if (jumpPoint) successorvec.pusback(jumpoint)
 			if (jumpPoint.pNode != nullptr)
-			{
 				successors.push_back(jumpPoint);
-			}
 		}
 		// return successorvec
 		return successors;
+	}
+
+	template <class T_NodeType, class T_ConnectionType>
+	typename JPS<T_NodeType, T_ConnectionType>::NodeRecord JPS<T_NodeType, T_ConnectionType>::Jump(const typename JPS<T_NodeType, T_ConnectionType>::NodeRecord& pCurrentNode, const Elite::Vector2& difference, T_NodeType* pStartNode, T_NodeType* pGoalNode)
+	{
+		// noderecord JUMP(current, Vec2{x,y}, start, end)
+		Elite::Vector2 currentNodePos = m_pGraph->GetNodeWorldPos(pCurrentNode.pNode);
+		// next = current + vec2
+		T_NodeType* pNextNode = m_pGraph->GetNodeAtWorldPos({ currentNodePos.x + difference.x, currentNodePos.y + difference.y });
+
+		NodeRecord nextJumpNR{};
+		nextJumpNR.pNode = pNextNode;
+		nextJumpNR.pConnection = m_pGraph->GetConnection(pCurrentNode.pNode->GetIndex(), pNextNode->GetIndex());
+		nextJumpNR.fCost = GetHeuristicCost(pCurrentNode.pNode, pGoalNode);
+		nextJumpNR.gCost = nextJumpNR.pConnection->GetCost() + pCurrentNode.gCost;
+
+		// if(next is terrain) return null
+		if (pNextNode->GetTerrainType() == TerrainType::Water)
+			return NodeRecord{};
+		
+		// if(next == end) return next
+		if (pNextNode == pGoalNode)
+			return nextJumpNR;
+
+		// diagonal case
+		// if(x != 0 && y != 0)
+		if (!Elite::AreEqual(difference.x, 0.f) && !Elite::AreEqual(difference.y, 0.f)) // Diagonal Case
+		{
+			// if(current.x + x == obstacle || current.y + y == obstacle) return next
+			if (m_pGraph->GetNodeAtWorldPos({ currentNodePos.x + difference.x, currentNodePos.y })->GetTerrainType() == TerrainType::Water
+			 || m_pGraph->GetNodeAtWorldPos({ currentNodePos.x, currentNodePos.y + difference.y })->GetTerrainType() == TerrainType::Water)
+				return nextJumpNR;
+
+			// Check horizontal and vertical directions for forced neighbors
+			// if (jump(next.x, next.y, x, 0, start, end) == null) return next
+			if (Jump(nextJumpNR, Elite::Vector2{difference.x, 0.f}, pStartNode, pGoalNode).pNode == nullptr)
+				return nextJumpNR;
+
+			// if (jump(next.x, next.y, 0, y, start, end) == null) return next
+			if (Jump(nextJumpNR, Elite::Vector2(0.f, difference.y), pStartNode, pGoalNode).pNode == nullptr)
+				return nextJumpNR;
+
+		}
+
+		// horizontal case
+		// else if( x != 0)
+		else if (!Elite::AreEqual(difference.x, 0.f)) // Horizontal Case
+		{
+			// if (current.y + 1 == obstacle) && if (current.x + x, current.y + 1 != obstacle)
+				// return next
+			if (m_pGraph->GetNodeAtWorldPos({ currentNodePos.x, currentNodePos.y + 1.f })->GetTerrainType() == TerrainType::Water
+			 && m_pGraph->GetNodeAtWorldPos({ currentNodePos.x + difference.x, currentNodePos.y + 1.f })->GetTerrainType() != TerrainType::Water)
+				return nextJumpNR;
+			// else if (current.y - 1 == obstacle) && if (current.x + x, current.y - 1 != obstacle)
+				// return next
+			else if (m_pGraph->GetNodeAtWorldPos({ currentNodePos.x, currentNodePos.y - 1.f })->GetTerrainType() == TerrainType::Water
+				  && m_pGraph->GetNodeAtWorldPos({ currentNodePos.x + difference.x, currentNodePos.y + 1.f })->GetTerrainType() != TerrainType::Water)
+				return nextJumpNR;
+		}
+
+		// vertical case
+		else  //Vertical Case
+		{
+			// if (current.x + 1 == obstacle) && if (current.x + 1, current.y + y != obstacle)
+				// return next
+			if (m_pGraph->GetNodeAtWorldPos({ currentNodePos.x + 1.f, currentNodePos.y })->GetTerrainType() == TerrainType::Water
+				&& m_pGraph->GetNodeAtWorldPos({ currentNodePos.x + 1.f, currentNodePos.y + difference.y })->GetTerrainType() != TerrainType::Water)
+				return nextJumpNR;
+
+			// else if (current.x - 1 == obstacle) && if (current.x - 1, current.y + y != obstacle)
+				// return next
+			if (m_pGraph->GetNodeAtWorldPos({ currentNodePos.x - 1.f, currentNodePos.y })->GetTerrainType() == TerrainType::Water
+				&& m_pGraph->GetNodeAtWorldPos({ currentNodePos.x - 1.f, currentNodePos.y + difference.y })->GetTerrainType() != TerrainType::Water)
+				return nextJumpNR;
+		}
+		
+		// return jump(next.x, next.y. x, y. start, end)
+		return Jump(nextJumpNR, difference, pStartNode, pGoalNode);
 	}
 
 	template <class T_NodeType, class T_ConnectionType>
