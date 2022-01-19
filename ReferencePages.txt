@@ -1,0 +1,7 @@
+https://gamedevelopment.tutsplus.com/tutorials/how-to-speed-up-a-pathfinding-with-the-jump-point-search-algorithm--gamedev-5818
+https://simonstoyanov.github.io/Project2_Jump-Point-Search-Algorithm/
+https://harablog.wordpress.com/2011/09/07/jump-point-search/
+https://www.gamedev.net/tutorials/programming/artificial-intelligence/jump-point-search-fast-a-pathfinding-for-uniform-cost-grids-r4220/
+https://zerowidth.com/2013/a-visual-explanation-of-jump-point-search.html#looking-ahead-horizontally-and-vertically
+https://harablog.wordpress.com/2011/08/26/fast-pathfinding-via-symmetry-breaking/
+https://sudonull.com/post/133299-Jump-Point-Search-Path-Algorithm
