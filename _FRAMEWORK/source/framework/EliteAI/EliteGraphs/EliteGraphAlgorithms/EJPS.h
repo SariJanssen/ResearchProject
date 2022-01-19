@@ -90,8 +90,8 @@ namespace Elite
 		NodeRecord nextJumpNR{};
 		nextJumpNR.pNode = pNextNode;
 		nextJumpNR.pConnection = m_pGraph->GetConnection(pCurrentNode.pNode->GetIndex(), pNextNode->GetIndex());
-		nextJumpNR.fCost = GetHeuristicCost(pCurrentNode.pNode, pGoalNode);
 		nextJumpNR.gCost = nextJumpNR.pConnection->GetCost() + pCurrentNode.gCost;
+		nextJumpNR.fCost = nextJumpNR.gCost + GetHeuristicCost(pCurrentNode.pNode, pGoalNode);
 
 		// if(next is terrain) return null
 		if (pNextNode->GetTerrainType() == TerrainType::Water)
@@ -160,8 +160,97 @@ namespace Elite
 	template <class T_NodeType, class T_ConnectionType>
 	std::vector<T_NodeType*> JPS<T_NodeType, T_ConnectionType>::FindPath(T_NodeType* pStartNode, T_NodeType* pGoalNode)
 	{
-		IdentifySuccessors(pStartNode, pStartNode, pGoalNode);
+		std::vector<T_NodeType*> path{};
+		std::vector<NodeRecord> openList{};
+		std::vector<NodeRecord> closedList{};
 
+		// Start node to add to open list
+		NodeRecord currentRecord{};
+		currentRecord.pNode = pStartNode;
+		currentRecord.pConnection = nullptr;
+		currentRecord.fCost = GetHeuristicCost(pStartNode, pGoalNode);
+		openList.push_back(currentRecord);
+
+		while (!openList.empty())
+		{
+			// pick from open list, the node with lowest f-score
+			currentRecord = openList[0];
+			for (const NodeRecord& recordFromList : openList)
+			{
+				if (recordFromList.fCost < currentRecord.fCost)
+				{
+					currentRecord = recordFromList;
+				}
+			}
+
+			auto currentRecordIt = std::find(openList.begin(), openList.end(), currentRecord);
+			openList.erase(currentRecordIt);
+			closedList.push_back(currentRecord);
+
+			// if (next = destination)
+			if (currentRecord.pNode == pGoalNode)
+			{
+				break;
+			}
+
+			// identify successors (instead of picking adjacent nodes)
+				// ->eliminates nodes that are not interesting to our path
+			auto successors = IdentifySuccessors(currentRecord, pStartNode, pGoalNode);
+
+			for (auto successor : successors)
+			{
+				// check if successor in closed list -> continue;
+				auto successorClosedList = std::find(closedList.begin(), closedList.end(), successor);
+				if (successorClosedList != closedList.end())
+				{
+					continue;
+				}
+
+				// check if successor in open list -> 
+				auto successorOpenList = std::find(openList.begin(), openList.end(), successor);
+					// if not in open list
+				if (successorOpenList == openList.end())
+				{
+					openList.push_back(successor);
+					continue;
+				}
+
+				// if in open list -> compare g-cost 
+				// -> if new successor g cost + 1 smaller -> previos-> parent == successor-> parent
+				if (successorOpenList->gCost > successor.gCost) //TODO: current record.gcost 
+				{
+					successorOpenList->pConnection = successor.pConnection;
+				}
+			}
+		}
+
+		//current = next
+			// while (current)
+				// path.pushback(current)
+				// current = current.connection.getfrom
+			// reverse path
+		path.push_back(pGoalNode);
+		while (currentRecord.pNode != pStartNode)
+		{
+			for (size_t i{}; i < closedList.size(); ++i)
+			{
+				int prevNodeIdx = currentRecord.pConnection->GetFrom();
+				if (closedList[i].pNode == m_pGraph->GetNode(prevNodeIdx))
+				{
+					path.push_back(closedList[i].pNode);
+					currentRecord = closedList[i];
+					break;
+				}
+			}
+		}
+
+		std::reverse(path.begin(), path.end());
+		return path;
+	}
+	
+	template <class T_NodeType, class T_ConnectionType>
+	void PreviousPath(T_NodeType* pStartNode, T_NodeType* pGoalNode)
+	{
 		// pick from open list, the node with lowest f-score
 			// if (next = destination)
 				//current = next
@@ -220,8 +309,7 @@ namespace Elite
 				// -> if new successor g cost + 1 smaller -> previos-> parent == successor-> parent
 				// calculate fcost
 			
-		
-		
+
 		std::vector<T_NodeType*> path{};
 		std::vector<NodeRecord> openList{};
 		std::vector<NodeRecord> closedList{};
