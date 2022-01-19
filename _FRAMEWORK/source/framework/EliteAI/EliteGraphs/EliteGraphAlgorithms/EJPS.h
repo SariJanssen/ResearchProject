@@ -34,6 +34,7 @@ namespace Elite
 
 	private:
 		float GetHeuristicCost(T_NodeType* pStartNode, T_NodeType* pEndNode) const;
+		std::vector<NodeRecord> IdentifySuccessors(T_NodeType* pCurrentNode, T_NodeType* pStartNode, T_NodeType* pGoalNode);
 
 		IGraph<T_NodeType, T_ConnectionType>* m_pGraph;
 		Heuristic m_HeuristicFunction;
@@ -47,8 +48,43 @@ namespace Elite
 	}
 
 	template <class T_NodeType, class T_ConnectionType>
+	std::vector<JPS<T_NodeType, T_ConnectionType>::NodeRecord> JPS<T_NodeType, T_ConnectionType>::IdentifySuccessors(T_NodeType* pCurrentNode, T_NodeType* pStartNode, T_NodeType* pGoalNode)
+	{
+		// vector IDENTIFY SUCCESSORS(current, start, end) 
+		std::vector<NodeRecord> successors{};
+
+		// get neighbors of current
+		auto& connectionList = m_pGraph->GetNodeConnections(pCurrentNode->GetIndex());
+		// for each neighbor
+		for (const auto& pConnection : connectionList)
+		{
+			// int x = clamp(neighbor.x - current.x, -1, 1)
+			// int y = clamp(neighbor.y - current.y, -1, 1)
+			int nodeIdx = pConnection->GetTo();
+			T_NodeType* pNeighborNode = m_pGraph->GetNode(nodeIdx);
+			Elite::Vector2 pNeighborNodePos = m_pGraph->GetNodeWorldPos(pNeighborNode);
+			Elite::Vector2 pCurrentNodePos = m_pGraph->GetNodeWorldPos(pCurrentNode);
+			int x = clamp(pNeighborNodePos.x - pCurrentNodePos.x, -1.f, 1.f);
+			int y = clamp(pNeighborNodePos.y - pCurrentNodePos.y, -1.f, 1.f);
+
+			// jumpPoint = noderecord jump(current.x, current.y, x, y, start, end)
+			NodeRecord jumpPoint{}; //jump
+
+			// if (jumpPoint) successorvec.pusback(jumpoint)
+			if (jumpPoint.pNode != nullptr)
+			{
+				successors.push_back(jumpPoint);
+			}
+		}
+		// return successorvec
+		return successors;
+	}
+
+	template <class T_NodeType, class T_ConnectionType>
 	std::vector<T_NodeType*> JPS<T_NodeType, T_ConnectionType>::FindPath(T_NodeType* pStartNode, T_NodeType* pGoalNode)
 	{
+		IdentifySuccessors(pStartNode, pStartNode, pGoalNode);
+
 		// pick from open list, the node with lowest f-score
 			// if (next = destination)
 				//current = next
