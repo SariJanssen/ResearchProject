@@ -1,4 +1,4 @@
-# ResearchTopic: JumpPointSearch (JPS) algorithm
+# ResearchTopic: Jump Point Search (JPS) algorithm
 
 The Jump Point Search algorithm is similar to the A* algorithm used for pathfinding from a single start to a single destination node.
 While A* is very good in most cases, it does perform badly with uniform cost grids.
