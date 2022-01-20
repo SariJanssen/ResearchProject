@@ -13,7 +13,7 @@ namespace Elite
 		struct NodeRecord
 		{
 			T_NodeType* pNode = nullptr;
-			NodeRecord* pParent = nullptr;
+			std::shared_ptr<NodeRecord> pParent = nullptr;
 			float gCost = 0.f; // cost so far = accumulated g-costs of all the connections leading up to this one
 			float fCost = 0.f; // estimatedTotalCost (= costSoFar + h-cost)
 
@@ -35,8 +35,8 @@ namespace Elite
 
 	private:
 		float GetHeuristicCost(T_NodeType* pStartNode, T_NodeType* pEndNode) const;
-		std::vector<std::shared_ptr<NodeRecord>> IdentifySuccessors(NodeRecord* pCurrentNode, T_NodeType* pStartNode, T_NodeType* pGoalNode);
-		std::shared_ptr<NodeRecord> Jump(NodeRecord* pCurrentNode, const Elite::Vector2& difference, T_NodeType* pStartNode, T_NodeType* pGoalNode);
+		std::vector<std::shared_ptr<NodeRecord>> IdentifySuccessors(std::shared_ptr<NodeRecord> pCurrentNode, T_NodeType* pStartNode, T_NodeType* pGoalNode);
+		std::shared_ptr<NodeRecord> Jump(std::shared_ptr<NodeRecord> pCurrentNode, const Elite::Vector2& difference, T_NodeType* pStartNode, T_NodeType* pGoalNode);
 
 		GridGraph<T_NodeType, T_ConnectionType>* m_pGraph;
 		Heuristic m_HeuristicFunction;
@@ -50,9 +50,8 @@ namespace Elite
 	}
 
 	template <class T_NodeType, class T_ConnectionType>
-	std::vector<std::shared_ptr<typename JPS<T_NodeType, T_ConnectionType>::NodeRecord>> JPS<T_NodeType, T_ConnectionType>::IdentifySuccessors(typename JPS<T_NodeType, T_ConnectionType>::NodeRecord* pCurrentNode, T_NodeType* pStartNode, T_NodeType* pGoalNode)
+	std::vector<std::shared_ptr<typename JPS<T_NodeType, T_ConnectionType>::NodeRecord>> JPS<T_NodeType, T_ConnectionType>::IdentifySuccessors(std::shared_ptr<typename JPS<T_NodeType, T_ConnectionType>::NodeRecord> pCurrentNode, T_NodeType* pStartNode, T_NodeType* pGoalNode)
 	{
-		// vector IDENTIFY SUCCESSORS(current, start, end) 
 		std::vector<std::shared_ptr<NodeRecord>> successors{};
 
 		// get neighbors of current
@@ -64,70 +63,62 @@ namespace Elite
 			// int y = clamp(neighbor.y - current.y, -1, 1)
 			int nodeIdx = pConnection->GetTo();
 			T_NodeType* pNeighborNode = m_pGraph->GetNode(nodeIdx);
+
 			Elite::Vector2 neighborNodePos = m_pGraph->GetNodeWorldPos(pNeighborNode);
 			Elite::Vector2 currentNodePos = m_pGraph->GetNodeWorldPos(pCurrentNode->pNode);
+
 			float x = neighborNodePos.x - currentNodePos.x;
 			float y = neighborNodePos.y - currentNodePos.y;
 
 			// jumpPoint = noderecord jump(current.x, current.y, x, y, start, end)
 			std::shared_ptr<NodeRecord> jumpPoint = Jump(pCurrentNode, Elite::Vector2{ x, y }, pStartNode, pGoalNode);
 
-			// if (jumpPoint) successorvec.pusback(jumpoint)
 			if (jumpPoint != nullptr)
 				successors.push_back(jumpPoint);
 		}
-		// return successorvec
 		return successors;
 	}
 
 	template <class T_NodeType, class T_ConnectionType>
-	std::shared_ptr<typename JPS<T_NodeType, T_ConnectionType>::NodeRecord> JPS<T_NodeType, T_ConnectionType>::Jump(typename JPS<T_NodeType, T_ConnectionType>::NodeRecord* pCurrentNode, const Elite::Vector2& difference, T_NodeType* pStartNode, T_NodeType* pGoalNode)
+	std::shared_ptr<typename JPS<T_NodeType, T_ConnectionType>::NodeRecord> JPS<T_NodeType, T_ConnectionType>::Jump(std::shared_ptr<typename JPS<T_NodeType, T_ConnectionType>::NodeRecord> pCurrentNode, const Elite::Vector2& difference, T_NodeType* pStartNode, T_NodeType* pGoalNode)
 	{
-		// noderecord JUMP(current, Vec2{x,y}, start, end)
 		Elite::Vector2 currentNodePos = m_pGraph->GetNodeWorldPos(pCurrentNode->pNode);
-		// next = current + vec2
 		T_NodeType* pNextNode = m_pGraph->GetNodeAtWorldPos({ currentNodePos.x + difference.x, currentNodePos.y + difference.y });
 		
 		if (pNextNode == nullptr)
 			return nullptr;
 
-		// if(next is terrain) return null
 		if (pNextNode->GetTerrainType() == TerrainType::Water)
 			return nullptr;
 
-		std::shared_ptr<NodeRecord> nextJumpNR = std::make_shared<NodeRecord>();
-		nextJumpNR->pNode = pNextNode;
-		nextJumpNR->pParent = pCurrentNode;
+		NodeRecord nextJumpNR{};
+		nextJumpNR.pNode = pNextNode;
+		nextJumpNR.pParent = pCurrentNode;
 		T_ConnectionType* pConnection = m_pGraph->GetConnection(pCurrentNode->pNode->GetIndex(), pNextNode->GetIndex());
-		nextJumpNR->gCost = pConnection->GetCost() + pCurrentNode->gCost;
-		nextJumpNR->fCost = nextJumpNR->gCost + GetHeuristicCost(pCurrentNode->pNode, pGoalNode);
+		nextJumpNR.gCost = pConnection->GetCost() + pCurrentNode->gCost;
+		nextJumpNR.fCost = nextJumpNR.gCost + GetHeuristicCost(pCurrentNode->pNode, pGoalNode);
+		std::shared_ptr<NodeRecord> pNextJumpNR{std::make_shared<NodeRecord>(nextJumpNR)};
 
-		// if(next == end) return next
 		if (pNextNode == pGoalNode)
-			return nextJumpNR;
+			return pNextJumpNR;
 
-		// diagonal case
-		// if(x != 0 && y != 0)
 		if (!Elite::AreEqual(difference.x, 0.f) && !Elite::AreEqual(difference.y, 0.f)) // Diagonal Case
 		{
 			// if(current.x + x == obstacle || current.y + y == obstacle) return next
 			if (m_pGraph->GetNodeAtWorldPos({ currentNodePos.x + difference.x, currentNodePos.y })->GetTerrainType() == TerrainType::Water
 			 || m_pGraph->GetNodeAtWorldPos({ currentNodePos.x, currentNodePos.y + difference.y })->GetTerrainType() == TerrainType::Water)
-				return nextJumpNR;
+				return pNextJumpNR;
 
 			// Check horizontal and vertical directions for forced neighbors
 			// if (jump(next.x, next.y, x, 0, start, end) == null) return next
-			if (Jump(nextJumpNR.get(), Elite::Vector2{difference.x, 0.f}, pStartNode, pGoalNode) == nullptr)
-				return nextJumpNR;
+			if (Jump(pNextJumpNR, Elite::Vector2{difference.x, 0.f}, pStartNode, pGoalNode) == nullptr)
+				return pNextJumpNR;
 
 			// if (jump(next.x, next.y, 0, y, start, end) == null) return next
-			if (Jump(nextJumpNR.get(), Elite::Vector2(0.f, difference.y), pStartNode, pGoalNode) == nullptr)
-				return nextJumpNR;
+			if (Jump(pNextJumpNR, Elite::Vector2(0.f, difference.y), pStartNode, pGoalNode) == nullptr)
+				return pNextJumpNR;
 
 		}
-
-		// horizontal case
-		// else if( x != 0)
 		else if (!Elite::AreEqual(difference.x, 0.f)) // Horizontal Case
 		{
 			int idx{};
@@ -138,13 +129,9 @@ namespace Elite
 			{
 				float nodeUp = m_pGraph->GetNodeWorldPos(idx).y;
 				// if (current.y + 1 == obstacle) && if (current.x + x, current.y + 1 != obstacle)
-				// return next
 				if (m_pGraph->GetNodeAtWorldPos({ currentNodePos.x, nodeUp })->GetTerrainType() == TerrainType::Water
 				 && m_pGraph->GetNodeAtWorldPos({ currentNodePos.x + difference.x, nodeUp })->GetTerrainType() != TerrainType::Water)
-					return nextJumpNR;
-				//if (m_pGraph->GetNodeAtWorldPos({ currentNodePos.x, currentNodePos.y + 1.f })->GetTerrainType() == TerrainType::Water
-				//	&& m_pGraph->GetNodeAtWorldPos({ currentNodePos.x + difference.x, currentNodePos.y + 1.f })->GetTerrainType() != TerrainType::Water)
-				//	return nextJumpNR;
+					return pNextJumpNR;
 			}
 
 			idx = pCurrentNode->pNode->GetIndex() - nrCols;
@@ -152,14 +139,11 @@ namespace Elite
 			{
 				float nodeDown = m_pGraph->GetNodeWorldPos(idx).y;
 				// else if (current.y - 1 == obstacle) && if (current.x + x, current.y - 1 != obstacle)
-					// return next
 				if (m_pGraph->GetNodeAtWorldPos({ currentNodePos.x, nodeDown })->GetTerrainType() == TerrainType::Water
 				 && m_pGraph->GetNodeAtWorldPos({ currentNodePos.x + difference.x, nodeDown })->GetTerrainType() != TerrainType::Water)
-					return nextJumpNR;
+					return pNextJumpNR;
 			}
 		}
-
-		// vertical case
 		else  //Vertical Case
 		{
 			int idx{};
@@ -176,7 +160,7 @@ namespace Elite
 				// return next
 				if (m_pGraph->GetNodeAtWorldPos({ nodeLeft, currentNodePos.y })->GetTerrainType() == TerrainType::Water
 				 && m_pGraph->GetNodeAtWorldPos({ nodeLeft, currentNodePos.y + difference.y })->GetTerrainType() != TerrainType::Water)
-					return nextJumpNR;
+					return pNextJumpNR;
 			}
 
 			idx = pCurrentNode->pNode->GetIndex() - 1;
@@ -188,12 +172,12 @@ namespace Elite
 					// return next
 				if (m_pGraph->GetNodeAtWorldPos({ nodeRight, currentNodePos.y })->GetTerrainType() == TerrainType::Water
 				 && m_pGraph->GetNodeAtWorldPos({ nodeRight, currentNodePos.y + difference.y })->GetTerrainType() != TerrainType::Water)
-					return nextJumpNR;
+					return pNextJumpNR;
 			}
 		}
 		
 		// return jump(next.x, next.y. x, y. start, end)
-		return Jump(nextJumpNR.get(), difference, pStartNode, pGoalNode);
+		return Jump(pNextJumpNR, difference, pStartNode, pGoalNode);
 	}
 
 	template <class T_NodeType, class T_ConnectionType>
@@ -236,7 +220,7 @@ namespace Elite
 
 			// identify successors (instead of picking adjacent nodes)
 				// ->eliminates nodes that are not interesting to our path
-			auto successors = IdentifySuccessors(pCurrentRecord.get(), pStartNode, pGoalNode);
+			auto successors = IdentifySuccessors(pCurrentRecord, pStartNode, pGoalNode);
 
 			for (std::shared_ptr<NodeRecord> successor : successors)
 			{
@@ -257,26 +241,19 @@ namespace Elite
 				}
 
 				// if in open list -> compare g-cost 
-				// -> if new successor g cost + 1 smaller -> previos-> parent == successor-> parent
-				if ((*successorOpenList)->gCost > successor->gCost) //TODO: current record.gcost 
+				// -> if new successor g cost smaller -> previos-> parent == successor-> parent
+				if ((*successorOpenList)->gCost > successor->gCost)
 				{
 					(*successorOpenList)->pParent = successor->pParent;
 				}
 			}
 		}
 
-		//current = next
-			// while (current)
-				// path.pushback(current)
-				// current = current.connection.getfrom
-			// reverse path
-		while (pCurrentRecord->pParent != nullptr)
+		NodeRecord* pNodes = pCurrentRecord.get();
+		while (pNodes != nullptr)
 		{
-			path.push_back(pCurrentRecord->pNode);
-			if (pCurrentRecord->pParent != nullptr)
-			{
-				pCurrentRecord = std::make_shared<NodeRecord>(*pCurrentRecord->pParent);
-			}
+			path.push_back(pNodes->pNode);
+			pNodes = pNodes->pParent.get();
 		}
 
 		std::reverse(path.begin(), path.end());
@@ -284,76 +261,9 @@ namespace Elite
 		{
 			std::cout << node->GetIndex() << std::endl;
 		}
-		//for (auto& node : closedList)
-		//{
-		//	delete node;
-		//}
-		//for (auto& node : openList)
-		//{
-		//	delete node;
-		//}
 
 		return path;
 	}
-	
-		// pick from open list, the node with lowest f-score
-			// if (next = destination)
-				//current = next
-				// while (current)
-					// path.pushback(current)
-					// current = current.connection.start
-				// reverse path
-				//end
-
-		// identify successors (instead of picking adjacent nodes)
-			// ->eliminates nodes that are not interesting to our path
-		
-			// vector IDENTIFY SUCCESSORS(current, start, end) 
-			// get neighbors of current
-			// for each neighbor
-				// int x = clamp(neighbor.x - current.x, -1, 1)
-				// int y = clamp(neighbor.y - current.y, -1, 1)
-
-				// jumpPoint = noderecord jump(current.x, current.y, x, y, start, end)
-				// if (jumpPoint) successorvec.pusback(jumpoint)
-
-			// return successorvec
-		
-		// noderecord JUMP(current, Vec2{x,y}, start, end)
-			// next = current + vec2
-			// if(next is terrain) return null
-			// if(next == end) return next
-
-			// diagonal case
-			// if(x != 0 && y != 0)
-				// if(current.x + x == obstacle || current.y + y == obstacle) return next
-				// if (jump(next.x, next.y, x, 0, start, end) == null) return next
-				// if (jump(next.x, next.y, 0, y, start, end) == null) return next
-			
-			// horizontal case
-			// else if( x != 0)
-				// if (current.y + 1 == obstacle) && if (current.x + x, current.y + 1 != obstacle)
-					// return next
-				// else if (current.y - 1 == obstacle) && if (current.x + x, current.y - 1 != obstacle)
-					// return next
-
-			// vertical case
-			// else
-				// if (current.x + 1 == obstacle) && if (current.x + 1, current.y + y != obstacle)
-					// return next
-				// else if (current.x - 1 == obstacle) && if (current.x - 1, current.y + y != obstacle)
-					// return next
-
-			// return jump(next.x, next.y. x, y. start, end)
-
-		// successors obtained
-			// check if successor in closed list -> continue;
-			// check if successor in open list -> 
-				// if not in open list -> calculate f cost and add
-				// if in open list -> compare g-cost 
-				// -> if new successor g cost + 1 smaller -> previos-> parent == successor-> parent
-				// calculate fcost
-			
 
 	template <class T_NodeType, class T_ConnectionType>
 	float Elite::JPS<T_NodeType, T_ConnectionType>::GetHeuristicCost(T_NodeType* pStartNode, T_NodeType* pEndNode) const

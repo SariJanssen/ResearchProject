@@ -1,0 +1,57 @@
+		// pick from open list, the node with lowest f-score
+			// if (next = destination)
+				//current = next
+				// while (current)
+					// path.pushback(current)
+					// current = current.connection.start
+				// reverse path
+				//end
+
+		// identify successors (instead of picking adjacent nodes)
+			// ->eliminates nodes that are not interesting to our path
+		
+			// vector IDENTIFY SUCCESSORS(current, start, end) 
+			// get neighbors of current
+			// for each neighbor
+				// int x = clamp(neighbor.x - current.x, -1, 1)
+				// int y = clamp(neighbor.y - current.y, -1, 1)
+
+				// jumpPoint = noderecord jump(current.x, current.y, x, y, start, end)
+				// if (jumpPoint) successorvec.pusback(jumpoint)
+
+			// return successorvec
+		
+		// noderecord JUMP(current, Vec2{x,y}, start, end)
+			// next = current + vec2
+			// if(next is terrain) return null
+			// if(next == end) return next
+
+			// diagonal case
+			// if(x != 0 && y != 0)
+				// if(current.x + x == obstacle || current.y + y == obstacle) return next
+				// if (jump(next.x, next.y, x, 0, start, end) == null) return next
+				// if (jump(next.x, next.y, 0, y, start, end) == null) return next
+			
+			// horizontal case
+			// else if( x != 0)
+				// if (current.y + 1 == obstacle) && if (current.x + x, current.y + 1 != obstacle)
+					// return next
+				// else if (current.y - 1 == obstacle) && if (current.x + x, current.y - 1 != obstacle)
+					// return next
+
+			// vertical case
+			// else
+				// if (current.x + 1 == obstacle) && if (current.x + 1, current.y + y != obstacle)
+					// return next
+				// else if (current.x - 1 == obstacle) && if (current.x - 1, current.y + y != obstacle)
+					// return next
+
+			// return jump(next.x, next.y. x, y. start, end)
+
+		// successors obtained
+			// check if successor in closed list -> continue;
+			// check if successor in open list -> 
+				// if not in open list -> calculate f cost and add
+				// if in open list -> compare g-cost 
+				// -> if new successor g cost + 1 smaller -> previos-> parent == successor-> parent
+				// calculate fcost
