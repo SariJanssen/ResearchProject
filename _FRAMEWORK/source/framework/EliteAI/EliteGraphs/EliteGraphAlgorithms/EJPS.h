@@ -257,10 +257,6 @@ namespace Elite
 		}
 
 		std::reverse(path.begin(), path.end());
-		for (auto& node : path)
-		{
-			std::cout << node->GetIndex() << std::endl;
-		}
 
 		return path;
 	}

@@ -136,8 +136,8 @@ extern bool gRequestShutdown;
 						--- GENERAL INCLUDES ---
 ===========================================================================*/
 #pragma region GeneralIncludes
-//#if defined(_DEBUG) && defined(USE_VLD)
-#if defined(USE_VLD)
+#if defined(_DEBUG) && defined(USE_VLD)
+//#if defined(USE_VLD)
 	#include "vld.h"
 #endif
 
