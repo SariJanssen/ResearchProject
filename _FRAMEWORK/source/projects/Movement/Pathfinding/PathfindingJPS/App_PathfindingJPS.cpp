@@ -99,7 +99,7 @@ void App_PathfindingJPS::Render(float deltaTime) const
 
 void App_PathfindingJPS::MakeGridGraph()
 {
-	m_pGridGraph = new GridGraph<GridTerrainNode, GraphConnection>(COLUMNS, ROWS, m_SizeCell, false, false, 1.f, 1.5f); // one bool == for diagonal paths allowed
+	m_pGridGraph = new GridGraph<GridTerrainNode, GraphConnection>(COLUMNS, ROWS, m_SizeCell, false, true, 1.f, 2.f); // one bool == for diagonal paths allowed
 
 	//Setup default terrain
 	m_pGridGraph->GetNode(86)->SetTerrainType(TerrainType::Water);
@@ -208,12 +208,19 @@ void App_PathfindingJPS::CalculatePath()
 	{
 		//BFS Pathfinding
 		//auto pathfinder = BFS<GridTerrainNode, GraphConnection>(m_pGridGraph);
-		auto pathfinder = JPS<GridTerrainNode, GraphConnection>(m_pGridGraph, m_pHeuristicFunction);
-		auto startNode = m_pGridGraph->GetNode(startPathIdx);
-		auto endNode = m_pGridGraph->GetNode(endPathIdx);
+		try
+		{
+			auto pathfinder = JPS<GridTerrainNode, GraphConnection>(m_pGridGraph, m_pHeuristicFunction);
+			auto startNode = m_pGridGraph->GetNode(startPathIdx);
+			auto endNode = m_pGridGraph->GetNode(endPathIdx);
 
-		m_vPath = pathfinder.FindPath(startNode, endNode);
+			m_vPath = pathfinder.FindPath(startNode, endNode);
 
+		}
+		catch (std::exception& e)
+		{
+			std::cout << e.what() << std::endl;
+		}
 		std::cout << "New Path Calculated" << std::endl;
 	}
 	else

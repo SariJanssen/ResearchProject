@@ -12,16 +12,16 @@ namespace Elite
 		struct NodeRecord
 		{
 			T_NodeType* pNode = nullptr;
-			T_ConnectionType* pConnection = nullptr; // connection from previous node to current pNode
+			NodeRecord* pParent = nullptr;
 			float gCost = 0.f; // cost so far = accumulated g-costs of all the connections leading up to this one
 			float fCost = 0.f; // estimatedTotalCost (= costSoFar + h-cost)
 
 			bool operator==(const NodeRecord& other) const
 			{
 				return pNode == other.pNode
-					&& pConnection == other.pConnection
 					&& AreEqual(gCost, other.gCost)
-					&& AreEqual(fCost, other.fCost);
+					&& AreEqual(fCost, other.fCost)
+					&& pParent == other.pParent;
 			};
 
 			bool operator<(const NodeRecord& other) const
@@ -34,8 +34,8 @@ namespace Elite
 
 	private:
 		float GetHeuristicCost(T_NodeType* pStartNode, T_NodeType* pEndNode) const;
-		std::vector<NodeRecord> IdentifySuccessors(const NodeRecord& pCurrentNode, T_NodeType* pStartNode, T_NodeType* pGoalNode);
-		NodeRecord Jump(const NodeRecord& pCurrentNode, const Elite::Vector2& difference, T_NodeType* pStartNode, T_NodeType* pGoalNode);
+		std::vector<NodeRecord*> IdentifySuccessors(NodeRecord* pCurrentNode, T_NodeType* pStartNode, T_NodeType* pGoalNode);
+		NodeRecord* Jump(NodeRecord* pCurrentNode, const Elite::Vector2& difference, T_NodeType* pStartNode, T_NodeType* pGoalNode);
 
 		GridGraph<T_NodeType, T_ConnectionType>* m_pGraph;
 		Heuristic m_HeuristicFunction;
@@ -49,13 +49,13 @@ namespace Elite
 	}
 
 	template <class T_NodeType, class T_ConnectionType>
-	std::vector<typename JPS<T_NodeType, T_ConnectionType>::NodeRecord> JPS<T_NodeType, T_ConnectionType>::IdentifySuccessors(const typename JPS<T_NodeType, T_ConnectionType>::NodeRecord& pCurrentNode, T_NodeType* pStartNode, T_NodeType* pGoalNode)
+	std::vector<typename JPS<T_NodeType, T_ConnectionType>::NodeRecord*> JPS<T_NodeType, T_ConnectionType>::IdentifySuccessors(typename JPS<T_NodeType, T_ConnectionType>::NodeRecord* pCurrentNode, T_NodeType* pStartNode, T_NodeType* pGoalNode)
 	{
 		// vector IDENTIFY SUCCESSORS(current, start, end) 
-		std::vector<NodeRecord> successors{};
+		std::vector<NodeRecord*> successors{};
 
 		// get neighbors of current
-		auto& connectionList = m_pGraph->GetNodeConnections(pCurrentNode.pNode->GetIndex());
+		auto& connectionList = m_pGraph->GetNodeConnections(pCurrentNode->pNode->GetIndex());
 		// for each neighbor
 		for (const auto& pConnection : connectionList)
 		{
@@ -64,15 +64,15 @@ namespace Elite
 			int nodeIdx = pConnection->GetTo();
 			T_NodeType* pNeighborNode = m_pGraph->GetNode(nodeIdx);
 			Elite::Vector2 neighborNodePos = m_pGraph->GetNodeWorldPos(pNeighborNode);
-			Elite::Vector2 currentNodePos = m_pGraph->GetNodeWorldPos(pCurrentNode.pNode);
+			Elite::Vector2 currentNodePos = m_pGraph->GetNodeWorldPos(pCurrentNode->pNode);
 			float x = neighborNodePos.x - currentNodePos.x;
 			float y = neighborNodePos.y - currentNodePos.y;
 
 			// jumpPoint = noderecord jump(current.x, current.y, x, y, start, end)
-			NodeRecord jumpPoint = Jump(pCurrentNode, Elite::Vector2{ x, y }, pStartNode, pGoalNode);
+			NodeRecord* jumpPoint = Jump(pCurrentNode, Elite::Vector2{ x, y }, pStartNode, pGoalNode);
 
 			// if (jumpPoint) successorvec.pusback(jumpoint)
-			if (jumpPoint.pNode != nullptr)
+			if (jumpPoint != nullptr)
 				successors.push_back(jumpPoint);
 		}
 		// return successorvec
@@ -80,25 +80,26 @@ namespace Elite
 	}
 
 	template <class T_NodeType, class T_ConnectionType>
-	typename JPS<T_NodeType, T_ConnectionType>::NodeRecord JPS<T_NodeType, T_ConnectionType>::Jump(const typename JPS<T_NodeType, T_ConnectionType>::NodeRecord& pCurrentNode, const Elite::Vector2& difference, T_NodeType* pStartNode, T_NodeType* pGoalNode)
+	typename JPS<T_NodeType, T_ConnectionType>::NodeRecord* JPS<T_NodeType, T_ConnectionType>::Jump(typename JPS<T_NodeType, T_ConnectionType>::NodeRecord* pCurrentNode, const Elite::Vector2& difference, T_NodeType* pStartNode, T_NodeType* pGoalNode)
 	{
 		// noderecord JUMP(current, Vec2{x,y}, start, end)
-		Elite::Vector2 currentNodePos = m_pGraph->GetNodeWorldPos(pCurrentNode.pNode);
+		Elite::Vector2 currentNodePos = m_pGraph->GetNodeWorldPos(pCurrentNode->pNode);
 		// next = current + vec2
 		T_NodeType* pNextNode = m_pGraph->GetNodeAtWorldPos({ currentNodePos.x + difference.x, currentNodePos.y + difference.y });
 		
 		if (pNextNode == nullptr)
-			return NodeRecord{};
+			return nullptr;
 
 		// if(next is terrain) return null
 		if (pNextNode->GetTerrainType() == TerrainType::Water)
-			return NodeRecord{};
+			return nullptr;
 		
-		NodeRecord nextJumpNR{};
-		nextJumpNR.pNode = pNextNode;
-		nextJumpNR.pConnection = m_pGraph->GetConnection(pCurrentNode.pNode->GetIndex(), pNextNode->GetIndex());
-		nextJumpNR.gCost = nextJumpNR.pConnection->GetCost() + pCurrentNode.gCost;
-		nextJumpNR.fCost = nextJumpNR.gCost + GetHeuristicCost(pCurrentNode.pNode, pGoalNode);
+		NodeRecord* nextJumpNR = new NodeRecord{};
+		nextJumpNR->pNode = pNextNode;
+		nextJumpNR->pParent = pCurrentNode;
+		T_ConnectionType* pConnection = m_pGraph->GetConnection(pCurrentNode->pNode->GetIndex(), pNextNode->GetIndex());
+		nextJumpNR->gCost = pConnection->GetCost() + pCurrentNode->gCost;
+		nextJumpNR->fCost = nextJumpNR->gCost + GetHeuristicCost(pCurrentNode->pNode, pGoalNode);
 
 		// if(next == end) return next
 		if (pNextNode == pGoalNode)
@@ -115,11 +116,11 @@ namespace Elite
 
 			// Check horizontal and vertical directions for forced neighbors
 			// if (jump(next.x, next.y, x, 0, start, end) == null) return next
-			if (Jump(nextJumpNR, Elite::Vector2{difference.x, 0.f}, pStartNode, pGoalNode).pNode == nullptr)
+			if (Jump(nextJumpNR, Elite::Vector2{difference.x, 0.f}, pStartNode, pGoalNode) == nullptr)
 				return nextJumpNR;
 
 			// if (jump(next.x, next.y, 0, y, start, end) == null) return next
-			if (Jump(nextJumpNR, Elite::Vector2(0.f, difference.y), pStartNode, pGoalNode).pNode == nullptr)
+			if (Jump(nextJumpNR, Elite::Vector2(0.f, difference.y), pStartNode, pGoalNode) == nullptr)
 				return nextJumpNR;
 
 		}
@@ -131,7 +132,7 @@ namespace Elite
 			int idx{};
 			int nrCols = m_pGraph->GetColumns();
 			
-			idx = pCurrentNode.pNode->GetIndex() + nrCols;
+			idx = pCurrentNode->pNode->GetIndex() + nrCols;
 			if (m_pGraph->IsNodeValid(idx))
 			{
 				float nodeUp = m_pGraph->GetNodeWorldPos(idx).y;
@@ -145,8 +146,8 @@ namespace Elite
 				//	return nextJumpNR;
 			}
 
-			idx = pCurrentNode.pNode->GetIndex() - nrCols;
-			if (m_pGraph->IsNodeValid(idx))
+			idx = pCurrentNode->pNode->GetIndex() - nrCols;
+			if (m_pGraph->IsNodeValid(idx) && idx >= 0)
 			{
 				float nodeDown = m_pGraph->GetNodeWorldPos(idx).y;
 				// else if (current.y - 1 == obstacle) && if (current.x + x, current.y - 1 != obstacle)
@@ -165,8 +166,8 @@ namespace Elite
 
 			// need to check node left and node right if valid 
 			// but node + difference will be valid because they are checked in successors
-			idx = pCurrentNode.pNode->GetIndex() + 1;
-			if (m_pGraph->IsNodeValid(idx) && (int(idx / nrRows) == int(pCurrentNode.pNode->GetIndex() / nrRows)))
+			idx = pCurrentNode->pNode->GetIndex() + 1;
+			if (m_pGraph->IsNodeValid(idx) && (int(idx / nrRows) == int(pCurrentNode->pNode->GetIndex() / nrRows)))
 			{
 				float nodeLeft = m_pGraph->GetNodeWorldPos(idx).x;
 
@@ -177,8 +178,8 @@ namespace Elite
 					return nextJumpNR;
 			}
 
-			idx = pCurrentNode.pNode->GetIndex() - 1;
-			if (m_pGraph->IsNodeValid(idx) && (int(idx / nrRows) == int(pCurrentNode.pNode->GetIndex() / nrRows)))
+			idx = pCurrentNode->pNode->GetIndex() - 1;
+			if (m_pGraph->IsNodeValid(idx) && idx >= 0 && (int(idx / nrRows) == int(pCurrentNode->pNode->GetIndex() / nrRows)))
 			{
 				float nodeRight = m_pGraph->GetNodeWorldPos(idx).x;
 
@@ -198,43 +199,43 @@ namespace Elite
 	std::vector<T_NodeType*> JPS<T_NodeType, T_ConnectionType>::FindPath(T_NodeType* pStartNode, T_NodeType* pGoalNode)
 	{
 		std::vector<T_NodeType*> path{};
-		std::vector<NodeRecord> openList{};
-		std::vector<NodeRecord> closedList{};
+		std::vector<NodeRecord*> openList{};
+		std::vector<NodeRecord*> closedList{};
 
 		// Start node to add to open list
-		NodeRecord currentRecord{};
-		currentRecord.pNode = pStartNode;
-		currentRecord.pConnection = nullptr;
-		currentRecord.fCost = GetHeuristicCost(pStartNode, pGoalNode);
-		openList.push_back(currentRecord);
+		NodeRecord* pCurrentRecord = new NodeRecord{};
+		pCurrentRecord->pNode = pStartNode;
+		pCurrentRecord->pParent = nullptr;
+		pCurrentRecord->fCost = GetHeuristicCost(pStartNode, pGoalNode);
+		openList.push_back(pCurrentRecord);
 
 		while (!openList.empty())
 		{
 			// pick from open list, the node with lowest f-score
-			currentRecord = openList[0];
-			for (const NodeRecord& recordFromList : openList)
+			pCurrentRecord = openList[0];
+			for (NodeRecord* recordFromList : openList)
 			{
-				if (recordFromList.fCost < currentRecord.fCost)
+				if (recordFromList->fCost < pCurrentRecord->fCost)
 				{
-					currentRecord = recordFromList;
+					pCurrentRecord = recordFromList;
 				}
 			}
 
-			auto currentRecordIt = std::find(openList.begin(), openList.end(), currentRecord);
+			auto currentRecordIt = std::find(openList.begin(), openList.end(), pCurrentRecord);
 			openList.erase(currentRecordIt);
-			closedList.push_back(currentRecord);
+			closedList.push_back(pCurrentRecord);
 
 			// if (next = destination)
-			if (currentRecord.pNode == pGoalNode)
+			if (pCurrentRecord->pNode == pGoalNode)
 			{
 				break;
 			}
 
 			// identify successors (instead of picking adjacent nodes)
 				// ->eliminates nodes that are not interesting to our path
-			auto successors = IdentifySuccessors(currentRecord, pStartNode, pGoalNode);
+			auto successors = IdentifySuccessors(pCurrentRecord, pStartNode, pGoalNode);
 
-			for (auto successor : successors)
+			for (NodeRecord* successor : successors)
 			{
 				// check if successor in closed list -> continue;
 				auto successorClosedList = std::find(closedList.begin(), closedList.end(), successor);
@@ -254,9 +255,10 @@ namespace Elite
 
 				// if in open list -> compare g-cost 
 				// -> if new successor g cost + 1 smaller -> previos-> parent == successor-> parent
-				if (successorOpenList->gCost > successor.gCost) //TODO: current record.gcost 
+				if ((*successorOpenList)->gCost > successor->gCost) //TODO: current record.gcost 
 				{
-					successorOpenList->pConnection = successor.pConnection;
+					(*successorOpenList)->pParent = successor->pParent;
+					delete successor;
 				}
 			}
 		}
@@ -266,22 +268,26 @@ namespace Elite
 				// path.pushback(current)
 				// current = current.connection.getfrom
 			// reverse path
-		path.push_back(pGoalNode);
-		while (currentRecord.pNode != pStartNode)
+		while (pCurrentRecord != nullptr)
 		{
-			for (size_t i{}; i < closedList.size(); ++i)
-			{
-				int prevNodeIdx = currentRecord.pConnection->GetFrom();
-				if (closedList[i].pNode == m_pGraph->GetNode(prevNodeIdx))
-				{
-					path.push_back(closedList[i].pNode);
-					currentRecord = closedList[i];
-					break;
-				}
-			}
+			path.push_back(pCurrentRecord->pNode);
+			pCurrentRecord = pCurrentRecord->pParent;
 		}
 
 		std::reverse(path.begin(), path.end());
+		for (auto& node : path)
+		{
+			std::cout << node->GetIndex() << std::endl;
+		}
+		//for (auto& node : closedList)
+		//{
+		//	delete node;
+		//}
+		//for (auto& node : openList)
+		//{
+		//	delete node;
+		//}
+
 		return path;
 	}
 	
